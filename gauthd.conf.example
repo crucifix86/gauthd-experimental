@@ -1,0 +1,55 @@
+[General]
+# Authentication server configuration with bcrypt support
+
+# Network settings
+ListenPort = 29400
+MaxConnections = 1000
+
+# Database connection
+[Database]
+Host = localhost
+Port = 3306
+User = pwgame
+Password = your_password_here
+Database = pw_game
+Charset = utf8
+
+# Authentication settings
+[Auth]
+# Hash type for new accounts (1=MD5, 2=Base64, 3=Binary, 4=Bcrypt)
+# Recommended: 4 (Bcrypt)
+DefaultHashType = 4
+
+# Bcrypt cost factor (10-15 recommended, higher = more secure but slower)
+BcryptCost = 12
+
+# Enable automatic migration from legacy to bcrypt
+AutoMigrate = true
+
+# Anti-brute force settings
+[Security]
+# Maximum login attempts before temporary ban
+MaxLoginAttempts = 5
+
+# Ban duration in seconds
+BanDuration = 300
+
+# Enable IP-based anti-brute force
+EnableIPBan = true
+
+# Logging
+[Logging]
+LogLevel = info
+LogFile = /var/log/gauthd.log
+LogRotate = daily
+
+# Performance
+[Performance]
+# Thread pool size
+ThreadPoolSize = 10
+
+# Connection timeout in seconds
+ConnectionTimeout = 30
+
+# Database connection pool
+DBPoolSize = 20
