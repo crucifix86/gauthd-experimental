@@ -1,0 +1,25 @@
+# Compiled binaries
+gauthd
+*.o
+*.a
+*.so
+
+# Build artifacts
+*.d
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Configuration files (don't commit sensitive data)
+gauthd.conf.local
+
+# Core dumps
+core
+core.*
