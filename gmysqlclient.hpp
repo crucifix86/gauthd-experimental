@@ -100,6 +100,12 @@ namespace GNET
 		
 		
 		bool MatrixPasswd(int &uid, Octets & identify, Octets & responce);
+		
+		// New bcrypt authentication methods
+		bool MatrixPasswdBcrypt(int &uid, const std::string& username, std::string& stored_hash);
+		bool UpdatePasswordToBcrypt(int uid, const std::string& bcrypt_hash);
+		bool CheckPasswordFormat(int uid, int& hash_type); // Returns: 1=MD5, 2=Base64, 3=Binary, 4=Bcrypt
+		
 		bool ClearOnlineRecord(unsigned int sid, int zid, int aid);
 		bool OnlineRecord(int uid, int &zid, int &zonelocalid, int &overwrite);
 		bool OnfflineRecord(int uid, int &zonelocalid, int &overwrite);

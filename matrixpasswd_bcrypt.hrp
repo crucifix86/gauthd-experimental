@@ -1,0 +1,177 @@
+#ifndef __GNET_MATRIXPASSWD_BCRYPT_HPP
+#define __GNET_MATRIXPASSWD_BCRYPT_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+#include "matrixpasswdarg"
+#include "matrixpasswdres"
+#include "authmanager.h"
+#include "gmysqlclient.hpp"
+#include "gauthserver.hpp"
+#include "bcrypt_auth.h"
+//#include <liblicense.h>
+#include "../include/beaktrace.h"
+#include "luaman.hpp"
+
+namespace GNET
+{
+
+class MatrixPasswdBcrypt : public ProxyRpc
+{
+#define	RPC_BASECLASS	ProxyRpc
+	#include "matrixpasswd"
+#undef	RPC_BASECLASS
+
+	bool SendFailLogin(int reason)
+	{
+		SetResult(MatrixPasswdRes(reason));
+		SendToSponsor();
+		return false;
+	}
+
+	bool SendAntibrut(unsigned int ip)
+	{
+		in_addr ip_t;
+		ip_t.s_addr = (unsigned long)ip;
+		const char * UserIp = inet_ntoa(ip_t);
+		static char line[64];
+		sprintf(line, "ipset add Antibrut %s 2>&1 & \n", UserIp);
+		system (line);
+		SetResult(MatrixPasswdRes(ERR_ACCOUNTLOCKED));
+		SendToSponsor();
+		return false;
+	}
+
+	bool Delivery(Manager::Session::ID proxy_sid, const OctetsStream& osArg)
+	{
+		MatrixPasswdArg arg;
+		osArg >> arg;
+
+		LuaManager * lua = LuaManager::GetInstance();
+		AuthManager *aum = AuthManager::GetInstance();
+		MysqlManager *db = MysqlManager::GetInstance();
+
+		if ( aum->AddAntibrut(arg.loginip) > 8 )
+		{
+			return SendAntibrut(arg.loginip);
+		}
+		
+		if ( !aum->ValidLogin(arg.account) )
+		{
+			return SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		int userid = 0;
+		std::string username = BcryptAuth::OctetsToString(arg.account);
+		std::string stored_hash;
+		
+		// Get user credentials with bcrypt support
+		if ( !db->MatrixPasswdBcrypt(userid, username, stored_hash) || userid <= 0 )
+		{
+			return SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		// Check password format
+		int hash_type = 1;
+		db->CheckPasswordFormat(userid, hash_type);
+		
+		// Convert client password to string
+		std::string client_password = BcryptAuth::OctetsToString(arg.password);
+		
+		bool auth_success = false;
+		
+		if (hash_type == 4 || BcryptAuth::IsBcryptHash(stored_hash))
+		{
+			// Use bcrypt authentication
+			auth_success = aum->AuthPasswdBcrypt(client_password, stored_hash);
+		}
+		else
+		{
+			// Legacy authentication (MD5/Base64/Binary)
+			Octets dbpass = BcryptAuth::StringToOctets(stored_hash);
+			Octets response;
+			
+			if (aum->AuthPasswd(arg.password, response))
+			{
+				// Compare with stored hash
+				auth_success = (response.size() == dbpass.size() && 
+							   memcmp(response.begin(), dbpass.begin(), response.size()) == 0);
+				
+				// If legacy auth succeeds, migrate to bcrypt
+				if (auth_success)
+				{
+					std::string new_bcrypt_hash;
+					if (aum->CreateBcryptHash(client_password, new_bcrypt_hash))
+					{
+						db->UpdatePasswordToBcrypt(userid, new_bcrypt_hash);
+					}
+				}
+			}
+		}
+		
+		if (!auth_success)
+		{
+			return SendFailLogin(ERR_INVALID_PASSWORD);
+		}
+		
+		// HWID validation
+		if ( arg.hwid.size() == 8 )
+		{
+			in_addr ip_t;
+			ip_t.s_addr = (unsigned long)arg.loginip;
+			std::string UserIp = inet_ntoa(ip_t);
+			
+			std::string UserLogin = username;
+			
+			std::string UserHwid;
+			UserHwid.resize(12);
+			sprintf((char*)UserHwid.c_str(), "%lld", *(unsigned long long*)arg.hwid.begin() );
+			
+			int errcode = lua->EventOnUserLogin( userid, UserLogin.c_str(), UserIp.c_str(), UserHwid.c_str() );
+			if (errcode)
+			{
+				return SendFailLogin(errcode);
+			}
+		}
+		else
+		{
+			return SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		VM_BEGIN
+		
+		if ( LIC_GET_ROLE_LIST )
+		{
+			MatrixPasswdRes res;
+			res.response.clear(); // Clear response for bcrypt auth
+			res.retcode = 0;
+			res.userid = userid;
+			res.algorithm = 0;
+			res.matrix.clear();
+			SetResult( &res );
+			SendToSponsor();
+		}
+		else
+		{
+			SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		VM_END
+		
+		return false;
+	}
+
+	void PostProcess(Manager::Session::ID proxy_sid,const OctetsStream& osArg, const OctetsStream& osRes)
+	{
+		// No post-processing needed
+	}
+
+	void OnTimeout( )
+	{
+		// Client timeout handling
+	}
+};
+
+};
+#endif

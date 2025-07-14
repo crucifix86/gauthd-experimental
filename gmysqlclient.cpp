@@ -391,6 +391,90 @@ bool MysqlManager::MatrixPasswd(int &uid, Octets & identify, Octets & responce)
 	return res;
 }
 
+bool MysqlManager::MatrixPasswdBcrypt(int &uid, const std::string& username, std::string& stored_hash)
+{
+	bool res = false;
+	MYSQL_MUTEX_BEGIN
+	
+	GSQL iSQL(0, 0, 0);
+	size_t SqlCount = 2;
+	iSQL.istr.resize(SqlCount);
+	
+	size_t i = 0;
+	sprintf((char*)iSQL.istr[i++].resize(LEN__QUERY).begin(),"CALL acquireuserpasswd('%s', @userid, @passwd)", username.c_str());
+	sprintf((char*)iSQL.istr[i++].resize(LEN__QUERY).begin(),"SELECT @userid, @passwd");
+	
+	if ( MysqlSender(iSQL) && iSQL.ostr.size() >= 1 )
+	{
+		size_t iIndex = GetIndexPos(iSQL,1);
+		
+		if (iSQL.ostr[iIndex].str.size() >= 2)
+		{
+			uid = GetRowNum(iSQL, iIndex, 0);
+			const char* hash_str = GetRowStr(iSQL, iIndex, 1);
+			if (hash_str) {
+				stored_hash = std::string(hash_str);
+				if (uid > 0 && !stored_hash.empty()) {
+					res = true;
+				}
+			}
+		}
+	}
+	
+	MYSQL_MUTEX_END
+	return res;
+}
+
+bool MysqlManager::UpdatePasswordToBcrypt(int uid, const std::string& bcrypt_hash)
+{
+	bool res = false;
+	MYSQL_MUTEX_BEGIN
+	
+	GSQL iSQL(0, 0, 0);
+	size_t SqlCount = 1;
+	iSQL.istr.resize(SqlCount);
+	
+	size_t i = 0;
+	sprintf((char*)iSQL.istr[i++].resize(LEN__QUERY).begin(),
+		"UPDATE auth SET passwd = '%s', passwd_type = 4 WHERE userid = %d", bcrypt_hash.c_str(), uid);
+	
+	if ( MysqlSender(iSQL) )
+	{
+		res = true;
+	}
+	
+	MYSQL_MUTEX_END
+	return res;
+}
+
+bool MysqlManager::CheckPasswordFormat(int uid, int& hash_type)
+{
+	bool res = false;
+	MYSQL_MUTEX_BEGIN
+	
+	GSQL iSQL(0, 0, 0);
+	size_t SqlCount = 1;
+	iSQL.istr.resize(SqlCount);
+	
+	size_t i = 0;
+	sprintf((char*)iSQL.istr[i++].resize(LEN__QUERY).begin(),
+		"SELECT passwd_type FROM auth WHERE userid = %d", uid);
+	
+	if ( MysqlSender(iSQL) && iSQL.ostr.size() >= 1 )
+	{
+		size_t iIndex = GetIndexPos(iSQL,0);
+		if (iSQL.ostr[iIndex].str.size() >= 1)
+		{
+			hash_type = GetRowNum(iSQL, iIndex, 0);
+			if (hash_type == 0) hash_type = 1; // Default to MD5 if not set
+			res = true;
+		}
+	}
+	
+	MYSQL_MUTEX_END
+	return res;
+}
+
 bool MysqlManager::ClearOnlineRecord(unsigned int sid, int zid, int aid)
 {
 	bool res = false;

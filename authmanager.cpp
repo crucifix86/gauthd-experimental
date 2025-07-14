@@ -15,6 +15,7 @@
 #include "addcash.hpp"
 
 #include "authmanager.h"
+#include "bcrypt_auth.h"
 
 using namespace GNET;
 
@@ -164,6 +165,32 @@ int AuthManager::AddAntibrut(int ip)
 	res = ++antibrut_user.at(idx).count;
 	else
 	antibrut_user.push_back(ANTIBRUT_USER(ip));
+	pthread_mutex_unlock(&antibrut_mutex);
+	return res;
+}
+
+bool AuthManager::AuthPasswdBcrypt(const std::string& password, const std::string& stored_hash)
+{
+	bool res = false;
+	pthread_mutex_lock(&antibrut_mutex);
+	try {
+		res = BcryptAuth::VerifyPassword(password, stored_hash);
+	} catch (...) {
+		res = false;
+	}
+	pthread_mutex_unlock(&antibrut_mutex);
+	return res;
+}
+
+bool AuthManager::CreateBcryptHash(const std::string& password, std::string& hash)
+{
+	bool res = false;
+	pthread_mutex_lock(&antibrut_mutex);
+	try {
+		res = BcryptAuth::HashPassword(password, hash);
+	} catch (...) {
+		res = false;
+	}
 	pthread_mutex_unlock(&antibrut_mutex);
 	return res;
 }

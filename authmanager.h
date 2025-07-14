@@ -10,6 +10,7 @@
 #include "rpcdefs.h"
 #include "callid.hxx"
 #include "state.hxx"
+#include "bcrypt_auth.h"
 
 namespace GNET
 { 
@@ -49,6 +50,10 @@ namespace GNET
 		void AuthBase64(Octets & in, Octets & out);
 		bool AuthPasswd(Octets & in, Octets & out);
 		bool ValidLogin(Octets & in);
+		
+		// New bcrypt authentication methods
+		bool AuthPasswdBcrypt(const std::string& password, const std::string& stored_hash);
+		bool CreateBcryptHash(const std::string& password, std::string& hash);
 		
 		void ClearAntibrut();
 		int SizeAntibrut();
