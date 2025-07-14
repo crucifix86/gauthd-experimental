@@ -1,0 +1,64 @@
+
+#ifndef __GNET_USERLOGOUT_HPP
+#define __GNET_USERLOGOUT_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+#include "gmysqlclient.hpp"
+#include "userlogoutarg"
+#include "userlogoutres"
+
+namespace GNET
+{
+
+class UserLogout : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "userlogout"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		UserLogoutArg *arg = (UserLogoutArg *)argument;
+		UserLogoutRes *res = (UserLogoutRes *)result;
+		
+		MysqlManager *db = MysqlManager::GetInstance();
+		int zonelocalsid = arg->localsid;
+		int overwrite = 1;
+
+		db->OnfflineRecord(arg->userid, zonelocalsid, overwrite);
+
+		if (overwrite == 1)
+		{
+			res->retcode = ERR_SUCCESS;
+		}
+		else
+		{
+			res->retcode = ERR_LOGOUT_FAIL;
+		}
+		
+		GAuthServer* ausm=GAuthServer::GetInstance();
+		Thread::RWLock::WRScoped l(ausm->locker_map);
+		if (ausm->usermap.find(arg->userid)!=ausm->usermap.end())
+		{
+			ausm->usermap.erase(arg->userid);
+		}
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// UserLogoutArg *arg = (UserLogoutArg *)argument;
+		// UserLogoutRes *res = (UserLogoutRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif

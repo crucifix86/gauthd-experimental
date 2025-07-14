@@ -1,0 +1,96 @@
+
+#ifndef __GNET_EC_SQLCREATEARENATEAM_HPP
+#define __GNET_EC_SQLCREATEARENATEAM_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+
+#include "ec_sqlcreatearenateamarg"
+#include "ec_sqlcreatearenateamres"
+
+#include "gmysqlclient.hpp"
+
+namespace GNET
+{
+
+class EC_SQLCreateArenaTeam : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "ec_sqlcreatearenateam"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		EC_SQLCreateArenaTeamArg *arg = (EC_SQLCreateArenaTeamArg *)argument;
+		EC_SQLCreateArenaTeamRes *res = (EC_SQLCreateArenaTeamRes *)result;
+		MysqlManager * db = MysqlManager::GetInstance();
+		
+		// bad name & name is created
+		if ( arg->team_name.size() < 2 || db->CheckName(arg->team_name) )
+		{
+			res->retcode = -2;
+			return;
+		}
+		
+		// check teams in player
+		if ( db->GetArenaTeam( 0, arg->capitan_id, res->team ) == ERR_SUCCESS )
+		{
+			res->retcode = -3;
+			return;
+		}
+		
+		
+		// get & create pPlayer
+		if ( (db->GetArenaPlayer(arg->capitan_id, res->player) != ERR_SUCCESS) && (db->CreateArenaPlayer(arg->capitan_id, arg->capitan_cls, arg->capitan_name, res->player ) != ERR_SUCCESS) )
+		{
+			res->retcode = -4;
+			return;
+		}
+		
+		// player in team
+		if ( res->player.team_id != 0 )
+		{
+			res->retcode = -5;
+			return;
+		}
+		
+		// create and check 
+		if ( (db->CreateArenaTeam( arg->capitan_id, arg->team_type, arg->team_name, res->team ) != ERR_SUCCESS) ) /*|| (db->GetArenaTeam( 0, arg->capitan_id, res->team ) != ERR_SUCCESS) )*/
+		{
+			res->retcode = -6;
+			return;
+		}
+		
+		if ( (db->GetArenaTeam( 0, arg->capitan_id, res->team ) != ERR_SUCCESS) )
+		{
+			res->retcode = -7;
+			return;
+		}
+		
+		
+		res->player.team_id = res->team.team_id;
+		if ( (db->SetArenaPlayer( arg->capitan_id, res->player ) == ERR_SUCCESS) && (db->SetArenaTeam( res->team.team_id, arg->capitan_id, res->team ) == ERR_SUCCESS) )
+		{
+			res->team_id = res->team.team_id;
+			res->retcode = ERR_SUCCESS;
+			return;
+		}
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// EC_SQLCreateArenaTeamArg *arg = (EC_SQLCreateArenaTeamArg *)argument;
+		// EC_SQLCreateArenaTeamRes *res = (EC_SQLCreateArenaTeamRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif

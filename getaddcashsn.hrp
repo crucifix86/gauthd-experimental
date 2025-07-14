@@ -1,0 +1,84 @@
+
+#ifndef __GNET_GETADDCASHSN_HPP
+#define __GNET_GETADDCASHSN_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+#include "getaddcashsnarg"
+#include "getaddcashsnres"
+#include "gmysqlclient.hpp"
+#include "gauthserver.hpp"
+#include "addcash.hpp"
+
+namespace GNET
+{
+
+class GetAddCashSN : public ProxyRpc
+{
+#define	RPC_BASECLASS	ProxyRpc
+	#include "getaddcashsn"
+#undef	RPC_BASECLASS
+
+	void SendFailCash(int userid, int zoneid, int sn)
+	{
+		printf("GetAddCashSN::SendFailCash: userid = %d , zoneid = %d , sn=%d \n", userid, zoneid, sn);
+	}
+	
+	bool Delivery(Manager::Session::ID proxy_sid, const OctetsStream& osArg)
+	{
+		GetAddCashSNArg arg;
+		osArg >> arg;
+		
+		//printf("GetAddCashSN::Delivery: \n");
+
+		if( GAuthServer::GetInstance()->Send(proxy_sid, *this ) )
+		{
+			return true;
+		}
+
+		SetResult(GetAddCashSNRes(ERR_DELIVER_SEND));
+		SendToSponsor();
+		SendFailCash(arg.userid, arg.zoneid, -1);
+		return false;
+	}
+
+	void PostProcess(Manager::Session::ID proxy_sid,const OctetsStream& osArg, const OctetsStream& osRes)
+	{
+		GetAddCashSNArg arg;
+		osArg >> arg;
+		GetAddCashSNRes res;
+		osRes >> res;
+		
+		int cash = 0;
+		MysqlManager * db = MysqlManager::GetInstance();
+		
+		if ( res.retcode != ERR_SUCCESS )
+		{
+			printf("GetAddCashSN::PostProcess: res.retcode != ERR_SUCCESS \n");
+			SendFailCash(res.userid, res.zoneid, res.sn);
+			return;
+		}
+		
+		if ( !db->UpdateUseCashSN(res.userid, res.zoneid, res.sn, cash) )
+		{
+			printf("GetAddCashSN::PostProcess: !db->UpdateUseCashSN \n");
+			SendFailCash(res.userid, res.zoneid, res.sn);
+			return;
+		}
+		
+		AddCash Cash = AddCash(res.userid, res.zoneid, res.sn, cash );
+		GAuthServer::GetInstance()->Send(proxy_sid, &Cash);
+	}
+
+	void OnTimeout( )
+	{
+		//GetAddCashSNArg arg;
+		//osArg >> arg;
+		//SendFailCash(arg.userid, arg.zoneid, false);
+	}
+
+};
+
+};
+#endif

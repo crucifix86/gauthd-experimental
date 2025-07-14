@@ -1,0 +1,47 @@
+
+#ifndef __GNET_EC_SQLSETARENATEAM_HPP
+#define __GNET_EC_SQLSETARENATEAM_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+
+#include "ec_sqlsetarenateamarg"
+#include "ec_sqlsetarenateamres"
+
+#include "gmysqlclient.hpp"
+
+namespace GNET
+{
+
+class EC_SQLSetArenaTeam : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "ec_sqlsetarenateam"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		EC_SQLSetArenaTeamArg *arg = (EC_SQLSetArenaTeamArg *)argument;
+		EC_SQLSetArenaTeamRes *res = (EC_SQLSetArenaTeamRes *)result;
+		
+		MysqlManager * db = MysqlManager::GetInstance();
+		res->retcode = db->SetArenaTeam(arg->team_id, arg->capitan_id, arg->team );
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// EC_SQLSetArenaTeamArg *arg = (EC_SQLSetArenaTeamArg *)argument;
+		// EC_SQLSetArenaTeamRes *res = (EC_SQLSetArenaTeamRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif

@@ -1,0 +1,45 @@
+
+#ifndef __GNET_EC_DBARENAPLAYERTOPLIST_HPP
+#define __GNET_EC_DBARENAPLAYERTOPLIST_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+
+#include "ec_dbarenaplayertoplistarg"
+#include "ec_dbarenaplayertoplistres"
+
+#include "gmysqlclient.hpp"
+
+namespace GNET
+{
+
+class EC_DBArenaPlayerTopList : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "ec_dbarenaplayertoplist"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		EC_DBArenaPlayerTopListArg *arg = (EC_DBArenaPlayerTopListArg *)argument;
+		EC_DBArenaPlayerTopListRes *res = (EC_DBArenaPlayerTopListRes *)result;
+		res->retcode = MysqlManager::GetInstance()->MakeArenaPlayerTopList( res->members );		
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// EC_DBArenaPlayerTopListArg *arg = (EC_DBArenaPlayerTopListArg *)argument;
+		// EC_DBArenaPlayerTopListRes *res = (EC_DBArenaPlayerTopListRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif

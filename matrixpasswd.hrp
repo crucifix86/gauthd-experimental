@@ -1,0 +1,143 @@
+
+#ifndef __GNET_MATRIXPASSWD_HPP
+#define __GNET_MATRIXPASSWD_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+#include "matrixpasswdarg"
+#include "matrixpasswdres"
+#include "authmanager.h"
+#include "gmysqlclient.hpp"
+#include "gauthserver.hpp"
+//#include <liblicense.h>
+#include "../include/beaktrace.h"
+#include "luaman.hpp"
+
+namespace GNET
+{
+
+class MatrixPasswd : public ProxyRpc
+{
+#define	RPC_BASECLASS	ProxyRpc
+	#include "matrixpasswd"
+#undef	RPC_BASECLASS
+
+	bool SendFailLogin(int reason)
+	{
+		SetResult(MatrixPasswdRes(reason));
+		SendToSponsor();
+		return false;
+	}
+
+	bool SendAntibrut(unsigned int ip)
+	{
+		in_addr ip_t;
+		ip_t.s_addr = (unsigned long)ip;
+		const char * UserIp = inet_ntoa(ip_t);
+		static char line[64];
+		sprintf(line, "ipset add Antibrut %s 2>&1 & \n", UserIp);
+		system (line);
+		SetResult(MatrixPasswdRes(ERR_ACCOUNTLOCKED));
+		SendToSponsor();
+		return false;
+	}
+
+	bool Delivery(Manager::Session::ID proxy_sid, const OctetsStream& osArg)
+	{
+		MatrixPasswdArg arg;
+		osArg >> arg;
+
+		LuaManager * lua = LuaManager::GetInstance();
+		AuthManager *aum = AuthManager::GetInstance();
+		MysqlManager *db = MysqlManager::GetInstance();
+
+		if ( aum->AddAntibrut(arg.loginip) > 8 )
+		{
+			//printf("MatrixPasswd::Delivery: antibrut error \n");
+			return SendAntibrut(arg.loginip);
+		}
+		
+		if ( !aum->ValidLogin(arg.account) )
+		{
+			//printf("MatrixPasswd::Delivery: valid login error \n");
+			return SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		int userid = 0;
+		Octets dbpass;
+		if ( !db->MatrixPasswd(userid, arg.account, dbpass) || userid <= 0 )
+		{
+			//printf("MatrixPasswd::Delivery: db error \n");
+			return SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		// LUA MANAGER HWID MODULE BEGIN//
+		if ( arg.hwid.size() == 8 )
+		{
+			in_addr ip_t;
+			ip_t.s_addr = (unsigned long)arg.loginip;
+			std::string UserIp;
+			UserIp = inet_ntoa(ip_t);
+			
+			std::string UserLogin((const char*)arg.account.begin(), arg.account.size());
+			
+			std::string UserHwid;
+			UserHwid.resize(12);
+			sprintf((char*)UserHwid.c_str(), "%lld", *(unsigned long long*)arg.hwid.begin() );
+			
+			int errcode = lua->EventOnUserLogin( userid, UserLogin.c_str(), UserIp.c_str(), UserHwid.c_str() );
+			if (errcode)
+			{
+				//printf("MatrixPasswd::Delivery: lua error \n");
+				return SendFailLogin(errcode);
+			}
+		}
+		else
+		{
+			//printf("MatrixPasswd::Delivery: hwid error \n");
+			return SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		// LUA MANAGER HWID MODULE END//
+		
+		VM_BEGIN
+		
+		if ( LIC_GET_ROLE_LIST )
+		{
+			MatrixPasswdRes res;
+			aum->AuthPasswd(dbpass, res.response);
+			res.retcode = 0;
+			res.userid = userid;
+			res.algorithm = 0;
+			res.matrix.clear();
+			SetResult( &res );
+			SendToSponsor();
+		}
+		else
+		{
+			SendFailLogin(ERR_INVALID_ACCOUNT);
+		}
+		
+		VM_END
+		
+		return false;
+	}
+
+	void PostProcess(Manager::Session::ID proxy_sid,const OctetsStream& osArg, const OctetsStream& osRes)
+	{
+		// TODO
+		// MatrixPasswdArg arg;
+		// osArg >> arg;
+		// MatrixPasswdRes res;
+		// osRes >> res;
+		// SetResult( &res ); // if you modified res, do not forget to call this. 
+	}
+
+	void OnTimeout( )
+	{
+		// TODO Client Only
+	}
+};
+
+};
+#endif

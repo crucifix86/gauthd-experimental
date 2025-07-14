@@ -1,0 +1,72 @@
+
+#ifndef __GNET_EC_DBARENATEAMTOPLISTDETAIL_HPP
+#define __GNET_EC_DBARENATEAMTOPLISTDETAIL_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+
+#include "ec_dbarenateamtoplistdetailarg"
+#include "ec_dbarenateamtoplistdetailres"
+
+#include "gmysqlclient.hpp"
+
+namespace GNET
+{
+
+class EC_DBArenaTeamTopListDetail : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "ec_dbarenateamtoplistdetail"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		EC_DBArenaTeamTopListDetailArg *arg = (EC_DBArenaTeamTopListDetailArg *)argument;
+		EC_DBArenaTeamTopListDetailRes *res = (EC_DBArenaTeamTopListDetailRes *)result;
+		
+		MysqlManager * db = MysqlManager::GetInstance();
+		
+		res->playerlist.clear();
+		EC_SQLArenaTeam pTeam;
+		res->retcode = db->GetArenaTeam(arg->teamid, 0, pTeam );
+		if ( res->retcode == ERR_SUCCESS )
+		{
+			for (size_t i = 0; i < pTeam.members.size() && i < 6; i++ )
+			{
+				EC_SQLArenaPlayer pPlayer;
+				res->retcode = db->GetArenaPlayer( pTeam.members[i].player_id , pPlayer);
+				if ( res->retcode == ERR_SUCCESS )
+				{
+					EC_ArenaPlayerTopList top_player;
+					top_player.player_id  	= pPlayer.player_id;
+					top_player.team_id	  	= pPlayer.team_id;
+					top_player.cls		  	= pPlayer.cls;
+					top_player.score		= pPlayer.score;
+					top_player.win_count	= pPlayer.win_count;
+					top_player.team_score	= pPlayer.team_score;
+					top_player.pos		  	= i;
+					top_player.name		  	= pPlayer.name;
+					
+					res->playerlist.push_back(top_player);
+				}
+			}
+		}
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// EC_DBArenaTeamTopListDetailArg *arg = (EC_DBArenaTeamTopListDetailArg *)argument;
+		// EC_DBArenaTeamTopListDetailRes *res = (EC_DBArenaTeamTopListDetailRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif

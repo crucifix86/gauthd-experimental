@@ -1,0 +1,50 @@
+
+#ifndef __GNET_EC_SQLCREATEARENAPLAYER_HPP
+#define __GNET_EC_SQLCREATEARENAPLAYER_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+
+#include "ec_sqlcreatearenaplayerarg"
+#include "ec_sqlcreatearenaplayerres"
+
+#include "gmysqlclient.hpp"
+
+namespace GNET
+{
+
+class EC_SQLCreateArenaPlayer : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "ec_sqlcreatearenaplayer"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		EC_SQLCreateArenaPlayerArg *arg = (EC_SQLCreateArenaPlayerArg *)argument;
+		EC_SQLCreateArenaPlayerRes *res = (EC_SQLCreateArenaPlayerRes *)result;
+		
+		MysqlManager * db = MysqlManager::GetInstance();
+		if ( (db->GetArenaPlayer(arg->roleid, res->player ) == ERR_SUCCESS) || (db->CreateArenaPlayer(arg->roleid, arg->cls, arg->name, res->player ) == ERR_SUCCESS) )
+		{
+			res->retcode = ERR_SUCCESS;
+		}
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// EC_SQLCreateArenaPlayerArg *arg = (EC_SQLCreateArenaPlayerArg *)argument;
+		// EC_SQLCreateArenaPlayerRes *res = (EC_SQLCreateArenaPlayerRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif

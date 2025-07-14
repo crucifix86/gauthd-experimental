@@ -1,0 +1,82 @@
+
+#ifndef __GNET_EC_SQLDELETEARENATEAM_HPP
+#define __GNET_EC_SQLDELETEARENATEAM_HPP
+
+#include "rpcdefs.h"
+#include "callid.hxx"
+#include "state.hxx"
+
+#include "ec_sqldeletearenateamarg"
+#include "ec_sqldeletearenateamres"
+
+#include "gmysqlclient.hpp"
+
+namespace GNET
+{
+
+class EC_SQLDeleteArenaTeam : public Rpc
+{
+#define	RPC_BASECLASS	Rpc
+	#include "ec_sqldeletearenateam"
+#undef	RPC_BASECLASS
+
+	void Server(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		EC_SQLDeleteArenaTeamArg *arg = (EC_SQLDeleteArenaTeamArg *)argument;
+		EC_SQLDeleteArenaTeamRes *res = (EC_SQLDeleteArenaTeamRes *)result;
+		EC_SQLArenaTeam pTeam;
+		MysqlManager * db = MysqlManager::GetInstance();
+		
+		if (db->GetArenaPlayer(arg->capitan_id, res->player) != ERR_SUCCESS)
+		{
+			res->retcode = -2;
+			return;
+		}
+		
+		if ( res->player.team_id != arg->team_id )
+		{
+			res->retcode = -3;
+			return;
+		}
+		
+		if ( db->GetArenaTeam( arg->team_id, arg->capitan_id, pTeam ) != ERR_SUCCESS )
+		{
+			res->retcode = -4;
+			return;
+		}
+		
+		if ( arg->capitan_id != pTeam.captain_id )
+		{
+			res->retcode = -5;
+			return;
+		}
+		
+		if ( pTeam.members.size() > 1 )
+		{
+			res->retcode = -6;
+			return;
+		}	
+		
+		if ( db->DeleteArenaTeam(arg->team_id) == ERR_SUCCESS )
+		{
+			res->retcode = ERR_SUCCESS;
+			return;
+		}
+	}
+
+	void Client(Rpc::Data *argument, Rpc::Data *result, Manager *manager, Manager::Session::ID sid)
+	{
+		// TODO
+		// EC_SQLDeleteArenaTeamArg *arg = (EC_SQLDeleteArenaTeamArg *)argument;
+		// EC_SQLDeleteArenaTeamRes *res = (EC_SQLDeleteArenaTeamRes *)result;
+	}
+
+	void OnTimeout()
+	{
+		// TODO Client Only
+	}
+
+};
+
+};
+#endif
